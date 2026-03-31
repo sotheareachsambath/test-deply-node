@@ -1,48 +1,48 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
-import { Employee } from './entities/employee.entity';
+import { PrismaService } from '../prisma/prisma.service';
+import { Employee } from '@prisma/client';
 
 @Injectable()
 export class EmployeeService {
-  private readonly employees: Employee[] = [];
-  private nextId = 1;
+  constructor(private readonly prisma: PrismaService) {}
 
-  create(createEmployeeDto: CreateEmployeeDto): Employee {
-    const employee: Employee = {
-      id: this.nextId++,
-      ...createEmployeeDto,
-    };
-    this.employees.push(employee);
-    return employee;
+  create(createEmployeeDto: CreateEmployeeDto): Promise<Employee> {
+    return this.prisma.employee.create({
+      data: createEmployeeDto,
+    });
   }
 
-  findAll(): Employee[] {
-    return this.employees;
+  findAll(): Promise<Employee[]> {
+    return this.prisma.employee.findMany({
+      orderBy: { id: 'asc' },
+    });
   }
 
-  findOne(id: number): Employee {
-    const employee = this.employees.find((item) => item.id === id);
+  async findOne(id: number): Promise<Employee> {
+    const employee = await this.prisma.employee.findUnique({
+      where: { id },
+    });
     if (!employee) {
       throw new NotFoundException(`Employee with id ${id} not found`);
     }
     return employee;
   }
 
-  update(id: number, updateEmployeeDto: UpdateEmployeeDto): Employee {
-    const employee = this.findOne(id);
-    const updatedEmployee = { ...employee, ...updateEmployeeDto };
-    const index = this.employees.findIndex((item) => item.id === id);
-    this.employees[index] = updatedEmployee;
-    return updatedEmployee;
+  async update(id: number, updateEmployeeDto: UpdateEmployeeDto): Promise<Employee> {
+    await this.findOne(id);
+    return this.prisma.employee.update({
+      where: { id },
+      data: updateEmployeeDto,
+    });
   }
 
-  remove(id: number): { message: string } {
-    const index = this.employees.findIndex((item) => item.id === id);
-    if (index === -1) {
-      throw new NotFoundException(`Employee with id ${id} not found`);
-    }
-    this.employees.splice(index, 1);
+  async remove(id: number): Promise<{ message: string }> {
+    await this.findOne(id);
+    await this.prisma.employee.delete({
+      where: { id },
+    });
     return { message: `Employee with id ${id} deleted` };
   }
 }
