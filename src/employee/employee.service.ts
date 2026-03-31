@@ -2,19 +2,19 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { PrismaService } from '../prisma/prisma.service';
-import { Employee } from '@prisma/client';
+import { Employee, Prisma } from '@prisma/client';
 
 @Injectable()
 export class EmployeeService {
   constructor(private readonly prisma: PrismaService) {}
 
-  create(createEmployeeDto: CreateEmployeeDto): Promise<Employee> {
+  async create(createEmployeeDto: CreateEmployeeDto): Promise<Employee> {
     return this.prisma.employee.create({
       data: createEmployeeDto,
     });
   }
 
-  findAll(): Promise<Employee[]> {
+  async findAll(): Promise<Employee[]> {
     return this.prisma.employee.findMany({
       orderBy: { id: 'asc' },
     });
@@ -30,19 +30,40 @@ export class EmployeeService {
     return employee;
   }
 
-  async update(id: number, updateEmployeeDto: UpdateEmployeeDto): Promise<Employee> {
-    await this.findOne(id);
-    return this.prisma.employee.update({
-      where: { id },
-      data: updateEmployeeDto,
-    });
+  async update(
+    id: number,
+    updateEmployeeDto: UpdateEmployeeDto,
+  ): Promise<Employee> {
+    try {
+      return await this.prisma.employee.update({
+        where: { id },
+        data: updateEmployeeDto,
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        throw new NotFoundException(`Employee with id ${id} not found`);
+      }
+      throw error;
+    }
   }
 
   async remove(id: number): Promise<{ message: string }> {
-    await this.findOne(id);
-    await this.prisma.employee.delete({
-      where: { id },
-    });
-    return { message: `Employee with id ${id} deleted` };
+    try {
+      await this.prisma.employee.delete({
+        where: { id },
+      });
+      return { message: `Employee with id ${id} deleted` };
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        throw new NotFoundException(`Employee with id ${id} not found`);
+      }
+      throw error;
+    }
   }
 }
